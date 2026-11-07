@@ -120,6 +120,9 @@ struct CaptureScreen: View {
             }
             Text("\(controller.rooms.count) room\(controller.rooms.count == 1 ? "" : "s") · \(controller.photoCount) photos")
               .font(.caption.monospacedDigit())
+            if controller.recordMagneticMeasurements {
+              Text(controller.magneticStatus).font(.caption.monospacedDigit())
+            }
             if controller.phase != .relocalizing {
               HStack(spacing: 6) {
                 AlignmentBadge(alignment: controller.alignment)
@@ -261,6 +264,12 @@ struct CaptureScreen: View {
       }
       Toggle("High-resolution automatic photos", isOn: $controller.highResolutionPhotos)
         .font(.subheadline)
+      Toggle("Record magnetic measurements", isOn: $controller.recordMagneticMeasurements)
+        .font(.subheadline)
+      if controller.recordMagneticMeasurements {
+        Text("Experimental: records magnetic strength and device-axis vectors at your camera position. Remove magnetic accessories. Sample at tracker heights; confirm hotspots with Rebocap. Measurements are saved when you finish the room.")
+          .font(.caption).foregroundStyle(.secondary)
+      }
       Text("Regular photos use camera frames for a lighter scan. High-resolution photos add processing and are limited to one request every 3 seconds while the phone is cool. The shutter always saves a regular photo.")
         .font(.caption).foregroundStyle(.secondary)
       Button {

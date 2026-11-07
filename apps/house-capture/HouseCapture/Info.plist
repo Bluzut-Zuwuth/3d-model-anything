@@ -30,6 +30,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>3D Model Anything uses the camera and LiDAR scanner to measure your rooms and take reference photos.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Record magnetic field measurements and device motion alongside your room scan when you enable magnetic recording.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>UILaunchScreen</key>

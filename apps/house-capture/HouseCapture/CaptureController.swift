@@ -75,6 +75,9 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   @Published private(set) var photoCount = 0
   private let autoPhotos = true
   @Published var highResolutionPhotos = false
+  @Published var recordMagneticMeasurements = false
+  @Published private(set) var magneticStatus = "Magnetic recording off"
+  private let magneticRecorder = MagneticRecorder()
   @Published private(set) var trackingIssue: TrackingRecovery.Issue? = .starting
   @Published private(set) var sessionNeedsRestart = false
   @Published private(set) var recordingSaveFailed = false
@@ -686,6 +689,8 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     engine.setRoom(nil)
     scanView.showRoom(nil)
     phase = .scanning
+    magneticRecorder.start(room: roomIndex, enabled: recordMagneticMeasurements)
+    magneticStatus = magneticRecorder.status
     applyGhostOpacity()
     refreshCoverage()
     diagnostics.log("room \(roomIndex) '\(roomName)' start", since: startedAt)
@@ -702,6 +707,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     if paused { resume() }
     commitCandidate(allowHighResolution: false)
     phase = .finishingRoom
+    magneticRecorder.stop()
     scanView.feed.isOn = false // freeze accepted mesh input for the export barrier
     // export the mesh while it's all still there, then let RoomPlan wrap up (didEndWith → finish)
     let file = bundle.file("mesh/room-\(roomIndex).ply")
@@ -721,6 +727,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   func pause() {
     guard phase == .scanning, !paused else { return }
     paused = true
+    magneticRecorder.stop()
     candidate = nil
     scanView.feed.isOn = false
     diagnostics.log("pause", since: startedAt)
@@ -731,6 +738,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     do { try CaptureReadiness.requireStorage(at: bundle.url) }
     catch { lastWarning = error.localizedDescription; return }
     paused = false
+    magneticRecorder.resume()
     previousPose = nil // no blur estimate across the gap
     scanView.feed.isOn = captureReady
     if captureReady { scanView.refeedEngine(from: arSession) } // the mesh kept growing while paused
@@ -817,6 +825,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     do {
       try depthRecorder.save()
       try bundle.savePhotos(photos)
+      try magneticRecorder.save(in: bundle)
     } catch {
       recordingSaveFailed = true
       lastWarning = "Some recording files could not be saved: \(error.localizedDescription). Free storage and finish the session to retry."
@@ -847,6 +856,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   /// Throws away the most recently captured room (e.g. to rescan it).
   func discardLastRoom() {
     guard phase == .betweenRooms, let last = rooms.popLast() else { return }
+    magneticRecorder.discard(room: last.index)
     if !last.file.isEmpty { capturedRooms.removeLast() }
     bundle.deleteRoom(index: last.index)
     try? FileManager.default.removeItem(at: bundle.file("mesh/room-\(last.index).ply"))
@@ -884,6 +894,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     if !retrying { await saveWorldMap(final: true) }
     stopTicking()
     arSession.pause()
+    magneticRecorder.stop()
     sessionRunning = false
     UIApplication.shared.isIdleTimerDisabled = false
     endedAt = Date()
@@ -892,6 +903,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     do {
       try bundle.savePhotos(photos)
       try depthRecorder.save()
+      try magneticRecorder.save(in: bundle)
       try writeManifest()
       house = try HouseProject.modify(house.id) {
         for room in rooms where !$0.rooms.contains(where: { r in r.history.contains { $0.session == plan.sessionID && $0.index == room.index } }) {
@@ -954,6 +966,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   /// Leave without saving anything: the session disappears from the house.
   func abandon() {
     closed = true
+    magneticRecorder.stop()
     stopTicking()
     if roomSessionCreated, phase == .scanning || phase == .finishingRoom { roomSession.stop() }
     arSession.pause()
@@ -1049,7 +1062,8 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
       photoCount: photos.count,
       depthFrames: depthRecorder.records.isEmpty ? nil : "depth/frames.json",
       depthFrameCount: depthRecorder.records.count,
-      diagnostics: diagnostics
+      diagnostics: diagnostics,
+      magneticFiles: rooms.map { "magnetic/room-\($0.index).json" }.filter { FileManager.default.fileExists(atPath: bundle.file($0).path) }
     ))
   }
 
@@ -1323,6 +1337,8 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
       diagnostics.whiteBalance = cameraControl.summary
     }
     guard !paused, captureReady else { return }
+    magneticRecorder.consider(frame)
+    if magneticStatus != magneticRecorder.status { magneticStatus = magneticRecorder.status }
     let budget = captureBudget
     depthRecorder.consider(frame, room: roomIndex, camera: cameraControl.state(for: frame), interval: budget.depthInterval)
     if frame.timestamp - lastEvaluate > budget.evaluationInterval {

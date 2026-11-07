@@ -26,7 +26,7 @@ import UIKit
 struct ScanBundle {
   let url: URL
 
-  static let subfolders = ["rooms", "mesh", "photos", "depth"]
+  static let subfolders = ["rooms", "mesh", "photos", "depth", "magnetic"]
 
   /// A new session folder inside a house: <house>/sessions/<id>/
   static func create(in house: HouseProject, id: String) throws -> ScanBundle {
@@ -55,6 +55,7 @@ struct ScanBundle {
   }
 
   func deleteRoom(index: Int) {
+    try? FileManager.default.removeItem(at: file("magnetic/room-\(index).json"))
     for name in ["room-\(index).json", "room-\(index).usdz", "room-\(index)-mesh.usdz", "room-\(index)-data.json"] {
       try? FileManager.default.removeItem(at: file("rooms/\(name)"))
     }
@@ -180,6 +181,10 @@ struct ScanBundle {
       try copy(frame.confidence)
       if let rgb = frame.rgb { try copy(rgb) }
     }
+    // Per-room files avoid leaking measurements from other rooms through Share room.
+    let magneticPath = "magnetic/room-\(index).json"
+    if manifest.magneticFiles?.contains(magneticPath) == true { try copy(magneticPath) }
+    manifest.magneticFiles = manifest.magneticFiles?.filter { $0 == magneticPath }
     try output.savePhotos(selectedPhotos)
     try encoder.encode(selectedDepth).write(to: output.file("depth/frames.json"))
     room.name = name
@@ -279,6 +284,8 @@ struct Manifest: Codable {
   var depthFrames: String?
   var depthFrameCount: Int?
   var diagnostics: Diagnostics?
+  /// Optional extension; old house-capture/5 bundles remain valid.
+  var magneticFiles: [String]?
 }
 
 /// What the capture session actually did, for debugging bundles after the fact

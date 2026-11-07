@@ -162,6 +162,7 @@ extension HouseProject {
         let removed = Set(room.history.filter { $0.session == sessionID }.map(\.index))
         if var manifest = bundle.manifest {
           manifest.rooms.removeAll { removed.contains($0.index) }
+          manifest.magneticFiles?.removeAll { path in removed.contains { path == "magnetic/room-\($0).json" } }
           manifest.structure = nil
           try bundle.writeManifest(manifest)
         }

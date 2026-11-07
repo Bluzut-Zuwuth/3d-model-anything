@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Room magnetic survey</title>
+  <link rel="stylesheet" href="./src/magnetic.css">
+</head>
+<body>
+  <header><a href="./index.html">3D Model Anything</a><h1>Magnetic survey</h1><span>Experimental</span></header>
+  <main>
+    <aside>
+      <label>Extracted room or session folder<input id="folder" type="file" webkitdirectory multiple></label>
+      <p>Choose a folder containing manifest.json. Files stay in this browser; nothing is uploaded.</p>
+      <label>Room<select id="room" disabled><option>No capture loaded</option></select></label>
+      <label class="check"><input id="calibrated" type="checkbox" checked> Hide uncalibrated samples</label>
+      <label>Minimum Y (m)<input id="min-y" type="number" step="0.1" disabled></label>
+      <label>Maximum Y (m)<input id="max-y" type="number" step="0.1" disabled></label>
+      <p>Y is height relative to the scan origin, not measured height above the floor.</p>
+      <button id="fit" type="button">Fit room and samples</button>
+      <output id="status" role="status">Load a capture made with magnetic recording enabled.</output>
+      <div class="legend"><span>Lower µT</span><span class="ramp"></span><span>Higher µT</span></div>
+      <p>Colors show the range in this room, not a safe/bad threshold. Only measured points are shown; gaps are unmeasured.</p>
+      <section><h2>Selected measurement</h2><output id="detail">Click a point to inspect its reading.</output></section>
+      <p>Magnetic direction remains in device coordinates. This version does not claim a room-space heading-error map or predict Rebocap drift.</p>
+    </aside>
+    <section id="view" aria-label="Room and measured magnetic samples"><canvas id="magnetic-canvas" aria-label="Drag to orbit, pinch or scroll to zoom. Select a sample to inspect its reading."></canvas></section>
+  </main>
+  <script type="module" src="./src/magnetic.ts"></script>
+</body>
+</html>

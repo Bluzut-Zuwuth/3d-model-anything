@@ -12,6 +12,9 @@ The app records the evidence. The skill guides an agent through measurement, mod
 
 ## Run the viewer
 
+Experimental local extension: see [Magnetic survey](docs/magnetic-survey.md) for
+opt-in iPhone magnetic recording and the local `/magnetic.html` measurement viewer.
+
 Use Node.js 22.12+ (or a newer supported release).
 
 ```sh

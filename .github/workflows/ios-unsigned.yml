@@ -1,0 +1,48 @@
+name: Build unsigned iPhone app
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Install project generator
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        working-directory: apps/house-capture
+        run: xcodegen generate
+      - name: Build for physical iPhone without signing
+        working-directory: apps/house-capture
+        run: |
+          xcodebuild \
+            -project HouseCapture.xcodeproj \
+            -scheme HouseCapture \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            PRODUCT_BUNDLE_IDENTIFIER=com.bluzut.roomsurvey \
+            build
+      - name: Package unsigned IPA
+        working-directory: apps/house-capture
+        run: |
+          mkdir -p package/Payload
+          ditto build/Build/Products/Release-iphoneos/HouseCapture.app package/Payload/HouseCapture.app
+          cd package
+          ditto -c -k --keepParent Payload RoomMagneticSurvey-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RoomMagneticSurvey-unsigned
+          path: apps/house-capture/package/RoomMagneticSurvey-unsigned.ipa
+          retention-days: 7
+          if-no-files-found: error

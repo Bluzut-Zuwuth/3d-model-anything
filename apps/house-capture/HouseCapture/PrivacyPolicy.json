@@ -8,11 +8,11 @@
     },
     {
       "title": "What the app saves",
-      "body": "When you scan, the app uses the camera and LiDAR to save room geometry, reference photos, depth frames, camera poses, and tracking maps on your device. It also saves room names, scan times, device and system information, and technical diagnostics such as tracking errors and memory or thermal conditions. Photos and room geometry can reveal private details of your surroundings."
+      "body": "When you scan, the app uses the camera and LiDAR to save room geometry, reference photos, depth frames, camera poses, and tracking maps on your device. If you enable magnetic recording, it also saves magnetic field measurements, sensor calibration quality, device attitude and timestamps paired with camera positions. It also saves room names, scan times, device and system information, and technical diagnostics such as tracking errors and memory or thermal conditions. Photos and room geometry can reveal private details of your surroundings."
     },
     {
       "title": "Permissions",
-      "body": "Camera access is requested when you start a scan. You can revoke it in the device Settings app. Importing, reviewing, deleting, and sharing existing scans does not require camera access. The app does not request access to your Contacts, location, microphone, or Photos library."
+      "body": "Camera access is requested when you start a scan. Motion sensor access may be requested when you enable magnetic recording. You can manage access in device Settings. Importing, reviewing, deleting, and sharing existing scans does not require camera access. The app does not request access to your Contacts, location, microphone, or Photos library."
     },
     {
       "title": "Sharing and Files",

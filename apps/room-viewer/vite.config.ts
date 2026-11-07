@@ -20,6 +20,7 @@ export default defineConfig({
     rolldownOptions: {
       input: {
         main: resolve(app, 'index.html'),
+        magnetic: resolve(app, 'magnetic.html'),
         play: resolve(app, 'play.html'),
         capture: resolve(app, 'tools/capture.html'),
       },
