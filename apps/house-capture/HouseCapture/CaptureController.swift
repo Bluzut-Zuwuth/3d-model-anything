@@ -78,6 +78,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   @Published var recordMagneticMeasurements = false
   @Published private(set) var magneticStatus = "Magnetic recording off"
   private let magneticRecorder = MagneticRecorder()
+  let liveGuide = LiveGuide()
   @Published private(set) var trackingIssue: TrackingRecovery.Issue? = .starting
   @Published private(set) var sessionNeedsRestart = false
   @Published private(set) var recordingSaveFailed = false
@@ -885,6 +886,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   // MARK: - Finish
 
   func finishSession() async {
+    liveGuide.disconnect()
     let retrying: Bool
     if case .failed = phase { retrying = true } else { retrying = false }
     guard phase == .betweenRooms || retrying else { return }
@@ -965,6 +967,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
 
   /// Leave without saving anything: the session disappears from the house.
   func abandon() {
+    liveGuide.disconnect()
     closed = true
     magneticRecorder.stop()
     stopTicking()
@@ -1297,6 +1300,9 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   }
 
   @objc private func onDisplayLink() {
+    liveGuide.update(phase: String(describing: phase), paused: paused || !captureReady,
+      tracking: String(describing: arSession.currentFrame?.camera.trackingState),
+      room: roomIndex, name: roomName, sample: magneticRecorder.samples.last)
     sampleDiagnostics()
     updateRecovery(arSession.currentFrame, now: CACurrentMediaTime())
     guard let frame = arSession.currentFrame, frame.timestamp != previousPose?.time else { return }

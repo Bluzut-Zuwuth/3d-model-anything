@@ -8,6 +8,7 @@ struct CaptureScreen: View {
   let onClose: () -> Void
   @State private var reviewing = false
   @State private var confirmClose = false
+  @State private var showingGuide = false
   @FocusState private var nameFocused: Bool
   @Environment(\.scenePhase) private var scenePhase
   static let roomSuggestions = ["Living room", "Kitchen", "Dining room", "Office", "Bedroom", "Primary bedroom", "Bathroom", "Hallway", "Basement", "Playroom", "Laundry", "Garage"]
@@ -20,6 +21,11 @@ struct CaptureScreen: View {
 
       VStack {
         topBar
+        Button { showingGuide = true } label: {
+          Label("Live scan guide · speak or type", systemImage: "waveform")
+            .font(.footnote.weight(.semibold)).padding(8)
+            .background(.regularMaterial, in: Capsule())
+        }
         if let notice = controller.notice {
           Label(notice, systemImage: "checkmark.circle.fill")
             .font(.footnote.weight(.semibold))
@@ -77,13 +83,20 @@ struct CaptureScreen: View {
         NavigationStack { ScanReview(source: source).toolbar { Button("Done") { reviewing = false } } }
       }
     }
+    .sheet(isPresented: $showingGuide) {
+      NavigationStack {
+        LiveGuidePanel(guide: controller.liveGuide)
+          .toolbar { Button("Done") { showingGuide = false } }
+      }.presentationDetents([.medium, .large])
+    }
+    .onDisappear { controller.liveGuide.disconnect() }
     .onChange(of: controller.phase) { old, next in
       if old == .finishingRoom, next == .betweenRooms, controller.reviewSource != nil, !controller.captureBudget.constrained { reviewing = true }
     }
     .onAppear { controller.begin() }
     .onChange(of: scenePhase) { _, phase in
       // leaving the app interrupts the camera: don't keep counting coverage across the gap
-      if phase != .active { controller.pause() }
+      if phase != .active { controller.liveGuide.disconnect(); controller.pause() }
     }
     .statusBarHidden()
   }

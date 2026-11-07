@@ -8,6 +8,7 @@ xcuserdata/
 __pycache__/
 *.pyc
 .env*
+data/live/
 data/captures-in/
 data/captures/
 data/recordings/

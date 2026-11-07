@@ -1,6 +1,6 @@
 {
   "title": "Privacy policy",
-  "updated": "October 7, 2026",
+  "updated": "November 7, 2026",
   "sections": [
     {
       "title": "Your scans stay under your control",
@@ -12,7 +12,11 @@
     },
     {
       "title": "Permissions",
-      "body": "Camera access is requested when you start a scan. Motion sensor access may be requested when you enable magnetic recording. You can manage access in device Settings. Importing, reviewing, deleting, and sharing existing scans does not require camera access. The app does not request access to your Contacts, location, microphone, or Photos library."
+      "body": "Camera access is requested when you start a scan. Motion sensor access may be requested when you enable magnetic recording. Optional live guidance requests Local Network access to connect to your chosen PC. Tap to speak requests microphone and speech recognition access; recognition is required to stay on-device, with typing as a fallback. The microphone stops when you close the guide panel or the app becomes inactive. You can manage permissions in Settings. The app does not request Contacts, location or Photos library access."
+    },
+    {
+      "title": "Optional live guide",
+      "body": "Only when you connect to a ready PC, the app sends magnetic measurements, sensor quality, room name, camera positions, scan status and submitted questions to that PC over a paired but unencrypted LAN connection. Use a trusted private network. No photos, mesh or raw microphone audio are sent. When you submit a question, the PC guide can send text, conversation context and a compact measurement summary to OpenAI through Codex using your PC login and account limits. This is a separate guide conversation. Replies are read aloud by iOS if enabled. The PC keeps a readable snapshot and recent measurements; manage those local files separately. The link stops when you stop the guide, finish/discard/leave the scan or the app becomes inactive, and does not reconnect automatically."
     },
     {
       "title": "Sharing and Files",

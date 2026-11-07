@@ -148,7 +148,8 @@ After each room, **Review saved room in 3D** opens the textured preview. Use cov
 ## Sharing and importing
 
 Use the system share sheet to AirDrop exports or save them to Files. No Mac receiver or companion
-app is required. The iOS app does not make network requests or request local-network access.
+app is required for exports. Optional **Live scan guide** connects to your chosen PC on a trusted
+private LAN and can speak replies inside the scanner. See [setup and data practices](../../tools/live-guide/README.md).
 To review an exported room/session on another device, extract its ZIP in Files, then use the
 home screen's import button to select the folder containing `manifest.json`. Imports create a new
 house, preserve original room indices and scan coordinates, and never replace existing scans.

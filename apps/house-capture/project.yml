@@ -27,6 +27,9 @@ targets:
         CFBundleDisplayName: 3D Model Anything
         NSCameraUsageDescription: 3D Model Anything uses the camera and LiDAR scanner to measure your rooms and take reference photos.
         NSMotionUsageDescription: Record magnetic field measurements and device motion alongside your room scan when you enable magnetic recording.
+        NSLocalNetworkUsageDescription: Connect to your chosen PC for an optional live magnetic scan guide.
+        NSMicrophoneUsageDescription: Transcribe your question on this iPhone when you tap to speak to the scan guide.
+        NSSpeechRecognitionUsageDescription: Recognize your scan questions on-device; use typing when local speech is unavailable.
         # Non-LiDAR devices can import and review scans; capture is checked at runtime.
         ITSAppUsesNonExemptEncryption: false
         HouseCapturePrivacyURL: "https://wesbos.github.io/3d-model-anything/privacy.html"
