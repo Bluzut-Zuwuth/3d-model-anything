@@ -6,7 +6,7 @@ import SwiftUI
 
 /// Opt-in, foreground-only LAN telemetry. Never sends photos, meshes or raw audio.
 @MainActor
-final class LiveGuide: ObservableObject {
+final class LiveGuide: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
   static let shared = LiveGuide()
   @Published var host = UserDefaults.standard.string(forKey: "guideHost") ?? "" {
     didSet { UserDefaults.standard.set(host, forKey: "guideHost") }
@@ -36,6 +36,7 @@ final class LiveGuide: ObservableObject {
     didSet { UserDefaults.standard.set(speechRate, forKey: "guideRate") }
   }
   @Published private(set) var guideAvailable = false
+  @Published private(set) var handsFree = false
   private var connection: NWConnection?
   private var buffer = Data()
   private var pending = 0
@@ -53,6 +54,46 @@ final class LiveGuide: ObservableObject {
   private var tapInstalled = false
   private var generation = UUID()
   private var speechGeneration = UUID()
+  private var replyUtterance: AVSpeechUtterance?
+  private var handsFreeTimer: Timer?
+  private var suppressPendingSpeech = false
+
+  override init() {
+    super.init()
+    speaker.delegate = self
+  }
+
+  func toggleHandsFree() {
+    if handsFree { stopHandsFree(); return }
+    guard connected, guideAvailable, !busy, !preparingSpeech else { return }
+    handsFree = true
+    Task { await startListening() }
+  }
+  func stopHandsFree() {
+    if busy { suppressPendingSpeech = true }
+    handsFree = false
+    handsFreeTimer?.invalidate(); handsFreeTimer = nil
+    stopListening(); stopSpeaking()
+    if connected { status = "Hands-free off · tap Talk for a question" }
+  }
+  private func resumeHandsFree() {
+    guard handsFree, connected, guideAvailable, !busy, !listening, !preparingSpeech,
+          UIApplication.shared.applicationState == .active else { return }
+    handsFreeTimer?.invalidate()
+    handsFreeTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self] _ in
+      Task { @MainActor in
+        guard let self, self.handsFree, self.connected, UIApplication.shared.applicationState == .active else { return }
+        await self.startListening()
+      }
+    }
+  }
+  nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+    Task { @MainActor in
+      guard self.replyUtterance === utterance else { return }
+      self.replyUtterance = nil
+      self.resumeHandsFree()
+    }
+  }
 
   var availableVoices: [AVSpeechSynthesisVoice] {
     let prefix = String(speechLanguage.prefix(2))
@@ -76,8 +117,8 @@ final class LiveGuide: ObservableObject {
     guard let voice = selectedVoice else { return "No matching iPhone voice available" }
     return "Using \(voice.name) · \(Self.qualityLabel(voice))"
   }
-  func stopSpeaking() { speaker.stopSpeaking(at: .immediate) }
-  private func speak(_ text: String) {
+  func stopSpeaking() { replyUtterance = nil; speaker.stopSpeaking(at: .immediate) }
+  private func speak(_ text: String, resumeAfter: Bool = false) {
     stopSpeaking()
     do {
       try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
@@ -86,11 +127,12 @@ final class LiveGuide: ObservableObject {
       utterance.voice = selectedVoice
       utterance.rate = Float(min(0.60, max(0.35, speechRate)))
       utterance.preUtteranceDelay = 0.1
+      if resumeAfter { replyUtterance = utterance }
       speaker.speak(utterance)
     } catch { status = "Audio playback unavailable; reply is shown as text" }
   }
   func previewVoice() {
-    stopListening()
+    stopHandsFree()
     speak(speechLanguage.hasPrefix("de") ? "Ich bin bereit. Bewege das iPhone langsam und halte die Messhöhe gleich." : "I'm ready. Move the iPhone slowly and keep the measurement height steady.")
   }
   func replayReply() { if !reply.isEmpty { stopListening(); speak(reply) } }
@@ -140,7 +182,7 @@ final class LiveGuide: ObservableObject {
 
   func disconnect() {
     generation = UUID()
-    stopListening()
+    stopHandsFree()
     speaker.stopSpeaking(at: .immediate)
     connection?.cancel(); connection = nil
     watchdog?.invalidate(); watchdog = nil
@@ -200,6 +242,7 @@ final class LiveGuide: ObservableObject {
     stopListening()
     speaker.stopSpeaking(at: .immediate)
     busy = true; status = "Guide is thinking…"
+    suppressPendingSpeech = false
     send(["type": "question", "text": text])
     question = ""
   }
@@ -235,11 +278,10 @@ final class LiveGuide: ObservableObject {
           }
           if type == "reply", let text = obj["text"] as? String {
             self.busy = false; self.reply = String(text.prefix(4000)); self.status = "Guide ready"
-            if self.speakReplies && !self.listening {
-              self.speak(self.reply)
-            }
+            if self.speakReplies && !self.listening && !self.suppressPendingSpeech { self.speak(self.reply, resumeAfter: self.handsFree) }
+            else { self.resumeHandsFree() }
           }
-          if type == "error" { self.busy = false; self.status = String((obj["text"] as? String ?? "Guide error").prefix(500)) }
+          if type == "error" { self.busy = false; self.stopHandsFree(); self.status = String((obj["text"] as? String ?? "Guide error").prefix(500)) }
         }
         if done || error != nil { self.disconnect() } else { self.receive(c, id: id) }
       }
@@ -260,9 +302,9 @@ final class LiveGuide: ObservableObject {
       AVAudioSession.sharedInstance().requestRecordPermission { continuation.resume(returning: $0) }
     }
     guard generation == id, speechGeneration == speechID, connected else { return }
-    guard permission == .authorized, mic else { status = "Enable microphone and speech access in Settings, or type"; return }
+    guard permission == .authorized, mic else { handsFree = false; status = "Enable microphone and speech access in Settings, or type"; return }
     guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: speechLanguage)), recognizer.supportsOnDeviceRecognition, recognizer.isAvailable else {
-      status = "On-device speech unavailable for this language; type your question"; return
+      handsFree = false; status = "On-device speech unavailable for this language; type your question"; return
     }
     speaker.stopSpeaking(at: .immediate)
     do {
@@ -284,7 +326,7 @@ final class LiveGuide: ObservableObject {
             if text != self.question {
               self.question = text
               self.silenceTimer?.invalidate()
-              if self.autoSendSpeech, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+              if self.autoSendSpeech || self.handsFree, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 self.silenceTimer = Timer.scheduledTimer(withTimeInterval: 1.8, repeats: false) { [weak self] _ in
                   Task { @MainActor in self?.finishSpeaking() }
                 }
@@ -292,16 +334,16 @@ final class LiveGuide: ObservableObject {
             }
           }
           if result?.isFinal == true { self.finishSpeaking() }
-          else if error != nil { self.stopListening(); self.status = "Speech interrupted; review or type your question" }
+          else if error != nil { self.stopHandsFree(); self.status = "Speech interrupted; tap Talk or type your question" }
         }
       }
       listening = true; question = ""
       engine.prepare(); try engine.start()
-      status = autoSendSpeech ? "Listening · sends after a short pause · Cancel to discard" : "Listening · tap Done, review, then Send"
+      status = handsFree ? "Hands-free listening · pause to send · Stop voice to end" : (autoSendSpeech ? "Listening · sends after a short pause · Cancel to discard" : "Listening · tap Done, review, then Send")
       micTimer = Timer.scheduledTimer(withTimeInterval: 45, repeats: false) { [weak self] _ in
-        Task { @MainActor in self?.stopListening() }
+        Task { @MainActor in self?.stopHandsFree() }
       }
-    } catch { stopListening(); status = "Could not start microphone; type instead" }
+    } catch { stopHandsFree(); status = "Could not start microphone; type instead" }
   }
 
   func stopListening() {
@@ -316,12 +358,12 @@ final class LiveGuide: ObservableObject {
     request = nil; recognition = nil
   }
   func finishSpeaking() {
-    let sendAutomatically = autoSendSpeech && listening
+    let sendAutomatically = (autoSendSpeech || handsFree) && listening
     stopListening()
     if sendAutomatically { ask() }
     else { status = "Review your question, then Send" }
   }
-  func cancelSpeech() { stopListening(); question = ""; status = "Question cancelled" }
+  func cancelSpeech() { stopHandsFree(); question = ""; status = "Question cancelled" }
 }
 
 struct LiveGuidePanel: View {
@@ -337,6 +379,8 @@ struct LiveGuidePanel: View {
       }
       if guide.connected {
         Section("Speak or type") {
+          Button(guide.handsFree ? "Stop hands-free voice" : "Start hands-free voice", action: guide.toggleHandsFree)
+            .disabled(!guide.guideAvailable || (guide.busy && !guide.handsFree))
           Button(guide.listening ? "Done speaking" : "Tap to speak") {
             if guide.listening { guide.finishSpeaking() } else { Task { await guide.startListening() } }
           }.disabled(guide.busy || guide.preparingSpeech || !guide.guideAvailable)
@@ -345,7 +389,7 @@ struct LiveGuidePanel: View {
           Button("Send question", action: guide.ask).disabled(guide.busy || !guide.guideAvailable || guide.listening || guide.question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           if !guide.reply.isEmpty { Text(guide.reply).textSelection(.enabled) }
           if !guide.reply.isEmpty { Button("Read reply again", action: guide.replayReply) }
-          Button("Stop playback", action: guide.stopSpeaking)
+          Button("Stop voice", action: guide.stopHandsFree)
         }
       }
       Section("What is shared") {
@@ -353,7 +397,7 @@ struct LiveGuidePanel: View {
       }
     }
     .navigationTitle("Live scan guide")
-    .onDisappear { guide.stopListening() }
+    .onDisappear { guide.stopHandsFree() }
   }
 }
 
@@ -377,6 +421,8 @@ struct ScanGuideBar: View {
         Button(action: showDetails) { Image(systemName: "text.bubble") }.accessibilityLabel("Guide text and settings")
       }
       Text(guide.status).font(.caption).lineLimit(2)
+      Button(guide.handsFree ? "Stop hands-free voice" : "Start hands-free voice", action: guide.toggleHandsFree)
+        .font(.caption.weight(.semibold)).disabled(!guide.connected || !guide.guideAvailable || (guide.busy && !guide.handsFree))
       if guide.listening || guide.preparingSpeech {
         HStack {
           Text(guide.question.isEmpty ? "Microphone preparing…" : guide.question).font(.caption).lineLimit(3)
@@ -385,7 +431,7 @@ struct ScanGuideBar: View {
         }
       } else if !guide.reply.isEmpty {
         Text(guide.reply).font(.caption).lineLimit(3)
-        Button("Stop voice", action: guide.stopSpeaking).font(.caption)
+        Button("Stop voice", action: guide.stopHandsFree).font(.caption)
       }
     }.padding(10).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding(.horizontal)
   }

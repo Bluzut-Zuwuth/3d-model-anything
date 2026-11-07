@@ -43,7 +43,7 @@ struct GuideSettingsSections: View {
       }.disabled(guide.listening || guide.preparingSpeech)
       Toggle("Read replies aloud", isOn: $guide.speakReplies)
       Toggle("Send after I stop speaking", isOn: $guide.autoSendSpeech)
-      Text("With automatic sending on, one tap listens for a question and sends it after a short pause. The microphone stays off while the guide replies. Tap Cancel to discard.").font(.caption)
+      Text("One-question mode sends after a short pause when enabled. On the scan screen, Start hands-free voice explicitly keeps turns going: listen, send, speak, then listen again. Stop ends it. The microphone stays off while replies play; use Talk to interrupt playback. This is turn-taking, not a full-duplex voice call.").font(.caption)
       Button("Prepare microphone & speech permissions") { Task { await guide.preparePermissions() } }
     }
     Section("iPhone voice") {
@@ -87,7 +87,7 @@ struct GuideSettingsScreen: View {
       }
     }
     .navigationTitle("Settings")
-    .onDisappear { guide.stopListening(); guide.stopSpeaking() }
+    .onDisappear { guide.stopHandsFree() }
     .onChange(of: scenePhase) { _, phase in if phase != .active { guide.disconnect() } }
   }
 }

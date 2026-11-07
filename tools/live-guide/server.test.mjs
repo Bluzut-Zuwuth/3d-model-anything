@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { once } from 'node:events';
+import { readFile, mkdtemp } from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
 
 const sample = { room: 0, timestamp: 100, motionTimestamp: 99.96, poseDeltaSeconds: .04,
   position: [1,2,3], cameraTransform: [1,0,0,0,0,1,0,0,0,0,1,0,1,2,3,1],
@@ -14,8 +17,9 @@ async function waitFor(check) {
 }
 test('pairing, readable telemetry, Unicode questions, rejected second phone and shutdown', { timeout: 15000 }, async t => {
   const base = 22000 + Math.floor(Math.random() * 10000);
+  const exportDir = await mkdtemp(path.join(os.tmpdir(), 'survey-server-'));
   const proc = spawn(process.execPath, ['tools/live-guide/server.mjs'], {
-    env: { ...process.env, SCAN_PORT: String(base), SCAN_DASHBOARD_PORT: String(base + 1) }, windowsHide: true
+    env: { ...process.env, SCAN_PORT: String(base), SCAN_DASHBOARD_PORT: String(base + 1), SCAN_EXPORT_DIR: exportDir }, windowsHide: true
   });
   t.after(() => proc.kill());
   let output = ''; proc.stdout.on('data', b => { output += b; });
@@ -39,6 +43,7 @@ test('pairing, readable telemetry, Unicode questions, rejected second phone and 
   assert.equal(data.measurements.latest.magnitudeMicrotesla, 50);
   assert.equal(data.status.roomName, 'Test room');
   assert.equal(data.measurements.fresh, true);
+  assert.equal(data.sessionHistory.magnetic.sampleCount, 1);
   const depth = await waitFor(async () => (await get()).lidar);
   assert.equal(depth.meshAnchors, 8);
   assert.equal(depth.fresh, true);
@@ -50,4 +55,11 @@ test('pairing, readable telemetry, Unicode questions, rejected second phone and 
   phone.write(JSON.stringify({ type: 'sample', sample: { ...sample, magnitudeMicrotesla: 200 } }) + '\n');
   await closed;
   await waitFor(async () => !(await get()).connected);
+  const exported = await waitFor(async () => (await get()).lastExport);
+  assert.ok(exported.zip.startsWith(exportDir));
+  const saved = JSON.parse(await readFile(exported.json, 'utf8'));
+  assert.equal(saved.events.filter(x => x.type === 'sample').length, 1);
+  assert.equal(saved.events.filter(x => x.type === 'lidar').length, 1);
+  assert.equal(saved.summary.reason, 'phone-disconnected');
+  assert.equal(JSON.stringify(saved).includes(token), false);
 });
