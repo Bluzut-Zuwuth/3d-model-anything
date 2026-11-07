@@ -83,7 +83,7 @@ struct GuideSettingsScreen: View {
       }
       GuideSettingsSections(guide: guide)
       Section("Privacy") {
-        Text("Nothing connects or listens automatically. Use Connect and Talk on the scan screen. Text and measurement summaries reach OpenAI through your PC’s Codex account when you ask the guide. Local network transport is unencrypted; use a trusted private network.").font(.caption)
+        Text("Connect explicitly, then use Talk for one question or Start hands-free voice for repeated turns. Hands-free reopens the microphone after replies until stopped, interrupted or backgrounded. Questions and session-history summaries reach OpenAI through your PC’s Codex account. The PC saves a complete session export on disconnect. LAN transport is unencrypted; use a trusted private network.").font(.caption)
       }
     }
     .navigationTitle("Settings")

@@ -21,7 +21,7 @@ final class LiveGuide: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
   @Published private(set) var preparingSpeech = false
   @Published private(set) var busy = false
   @Published var speakReplies = UserDefaults.standard.object(forKey: "guideSpeak") as? Bool ?? true {
-    didSet { UserDefaults.standard.set(speakReplies, forKey: "guideSpeak"); if !speakReplies { stopSpeaking() } }
+    didSet { UserDefaults.standard.set(speakReplies, forKey: "guideSpeak"); if !speakReplies { stopSpeaking(); resumeHandsFree() } }
   }
   @Published var speechLanguage = UserDefaults.standard.string(forKey: "guideLanguage") ?? "en-US" {
     didSet { UserDefaults.standard.set(speechLanguage, forKey: "guideLanguage") }
@@ -129,7 +129,7 @@ final class LiveGuide: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
       utterance.preUtteranceDelay = 0.1
       if resumeAfter { replyUtterance = utterance }
       speaker.speak(utterance)
-    } catch { status = "Audio playback unavailable; reply is shown as text" }
+    } catch { stopHandsFree(); status = "Audio playback unavailable; reply is shown as text" }
   }
   func previewVoice() {
     stopHandsFree()
