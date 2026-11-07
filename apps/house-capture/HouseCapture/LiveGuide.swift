@@ -146,6 +146,7 @@ final class LiveGuide: ObservableObject {
     watchdog?.invalidate(); watchdog = nil
     buffer.removeAll(); pending = 0
     connected = false; connecting = false; busy = false; guideAvailable = false
+    question = ""; reply = ""
     lastSample = -.infinity; lastStatus = -.infinity; lastDepth = -.infinity
     status = "Guide disconnected"
     try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)

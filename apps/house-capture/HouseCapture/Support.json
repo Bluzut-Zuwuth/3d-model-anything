@@ -1,7 +1,19 @@
 {
   "title": "Help & support",
-  "updated": "October 7, 2026",
+  "updated": "November 7, 2026",
   "sections": [
+    {
+      "title": "Live survey without saving",
+      "body": "Tap Live survey · don’t save on the home screen. No house or room is needed. The app uses LiDAR, camera tracking and magnetic measurements in memory, without creating scan files. Stop & clear, Close or leaving the foreground clears the phone’s survey state. A connected PC can still keep its own readable snapshot. Camera permission is required. ARKit world Y is not height above the floor."
+    },
+    {
+      "title": "Set up the guide and voice",
+      "body": "Open Settings using the gear icon. Save your PC’s private address and pairing code, prepare microphone/speech permissions, choose English or Deutsch and preview an iPhone voice. Enhanced or Premium voices must first be downloaded in iPhone Accessibility speech settings; then refresh the installed list. Start the PC receiver on your trusted home network. On a scan screen tap Connect guide, then Talk to guide. With Send after I stop speaking enabled, a short pause sends the question; Cancel discards it. Disable this option to review first. The microphone does not re-arm automatically. Text questions, replay and connection settings are behind the text-bubble button. This is a separate Codex guide conversation using the PC login and account limits."
+    },
+    {
+      "title": "Save a LiDAR and magnetic survey",
+      "body": "For an export, create or open a house and start a room scan. Enable LiDAR + magnetic only · save survey before starting. This records geometry, depth/confidence frames, position and magnetic samples, without new reference photos or depth RGB images. Full room scanning is still available. Save the survey, then finish the session to share it. The camera still runs for tracking. Strength readings alone cannot establish Rebocap interference or identify its source."
+    },
     {
       "title": "Supported devices",
       "body": "Scanning requires a LiDAR-equipped iPhone Pro or iPad Pro running iOS or iPadOS 17 or later. Other supported devices can import, view, and share existing scans. A Mac companion app is not required."

@@ -12,14 +12,17 @@ final class LiveSurvey: ObservableObject {
   private var timer: Timer?
   private var runID = UUID()
   @Published private(set) var running = false
+  @Published private(set) var starting = false
   @Published private(set) var status = "Ready for a live survey"
   @Published private(set) var magneticStatus = "Magnetic sensor waiting"
   @Published private(set) var position = "Position waiting"
   @Published private(set) var meshCount = 0
 
   func start() async {
-    guard !running else { return }
+    guard !running, !starting else { return }
     let id = runID
+    starting = true
+    defer { if runID == id { starting = false } }
     var authorized = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
     if !authorized { authorized = await AVCaptureDevice.requestAccess(for: .video) }
     guard runID == id else { return }
@@ -63,7 +66,7 @@ final class LiveSurvey: ObservableObject {
     view.session = ARSession()
     magnetic.discard(room: 0)
     guide.disconnect()
-    running = false; meshCount = 0; position = "Position cleared"
+    running = false; starting = false; meshCount = 0; position = "Position cleared"
     magneticStatus = "Measurements cleared"; status = "Stopped · phone survey data cleared"
     UIApplication.shared.isIdleTimerDisabled = false
   }
@@ -100,7 +103,7 @@ struct LiveSurveyScreen: View {
           if survey.running {
             Button("Stop & clear", action: survey.stop).buttonStyle(.borderedProminent)
           } else {
-            Button("Start live survey") { Task { await survey.start() } }.buttonStyle(.borderedProminent)
+            Button(survey.starting ? "Preparing…" : "Start live survey") { Task { await survey.start() } }.buttonStyle(.borderedProminent).disabled(survey.starting)
           }
         }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16)).padding()
       }

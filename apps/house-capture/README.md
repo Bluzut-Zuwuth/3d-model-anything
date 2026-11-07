@@ -147,6 +147,17 @@ After each room, **Review saved room in 3D** opens the textured preview. Use cov
 
 ## Sharing and importing
 
+For a quick measurement session, use **Live survey · don’t save** on the home screen.
+It creates no house, room or capture files; stopping or leaving the foreground clears its
+in-memory AR and magnetic state. A connected PC keeps a separate readable snapshot.
+The gear opens Settings for a remembered PC connection, on-device speech, installed voice
+selection, voice preview and speed. **Connect guide** and **Talk to guide** are on both scan
+screens. Automatic speech sending is optional and never re-arms the microphone.
+
+For a saved export without new photos, enable **LiDAR + magnetic only · save survey** before
+starting a room. Geometry, depth/confidence, poses and magnetic samples are saved; reference
+photos and depth RGB images are omitted. The camera remains required for AR tracking.
+
 Use the system share sheet to AirDrop exports or save them to Files. No Mac receiver or companion
 app is required for exports. Optional **Live scan guide** connects to your chosen PC on a trusted
 private LAN and can speak replies inside the scanner. See [setup and data practices](../../tools/live-guide/README.md).
