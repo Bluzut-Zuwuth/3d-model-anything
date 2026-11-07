@@ -16,6 +16,17 @@ export function validSample(s) {
   return Math.abs(Math.hypot(...s.fieldDeviceMicrotesla) - s.magnitudeMicrotesla) < .001 &&
     s.position.every((v, i) => Math.abs(v - s.cameraTransform[12 + i]) < .001);
 }
+export function validLiDAR(s) {
+  return !!s && Number.isFinite(s.timestamp) && Number.isInteger(s.room) && s.room >= 0 &&
+    vector(s.position, 3) && [s.width, s.height].every(n => Number.isInteger(n) && n > 0 && n <= 4096) &&
+    Number.isInteger(s.sampleStride) && s.sampleStride >= 1 && s.sampleStride <= 64 &&
+    Number.isInteger(s.validSampledPoints) && s.validSampledPoints >= 0 &&
+    s.validSampledPoints <= Math.ceil(s.width / s.sampleStride) * Math.ceil(s.height / s.sampleStride) &&
+    Number.isInteger(s.meshAnchors) && s.meshAnchors >= 0 && s.meshAnchors <= 100000 &&
+    (s.validSampledPoints === 0 ? s.nearestMeters == null && s.farthestMeters == null :
+      Number.isFinite(s.nearestMeters) && Number.isFinite(s.farthestMeters) && s.nearestMeters > 0 &&
+      s.farthestMeters >= s.nearestMeters && s.farthestMeters <= 10);
+}
 export function summarize(samples, now = Date.now()) {
   const room = samples.at(-1)?.room;
   const recent = samples.filter(x => now - x.receivedAt < 60000 && x.room === room);

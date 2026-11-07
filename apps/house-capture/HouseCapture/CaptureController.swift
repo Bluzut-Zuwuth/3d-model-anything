@@ -78,7 +78,8 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   @Published var recordMagneticMeasurements = false
   @Published private(set) var magneticStatus = "Magnetic recording off"
   private let magneticRecorder = MagneticRecorder()
-  let liveGuide = LiveGuide()
+  let liveGuide = LiveGuide.shared
+  @Published var surveyOnly = UserDefaults.standard.bool(forKey: "surveyDefault")
   @Published private(set) var trackingIssue: TrackingRecovery.Issue? = .starting
   @Published private(set) var sessionNeedsRestart = false
   @Published private(set) var recordingSaveFailed = false
@@ -87,7 +88,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   private var sessionInterrupted = false
   private var lastHighResRequest: TimeInterval = -.infinity
   var captureReady: Bool { recovery.canCapture && !sessionNeedsRestart && !sessionInterrupted }
-  var canTakePhoto: Bool { phase == .scanning && !paused && captureReady && !highResInFlight && photosInFlight == 0 }
+  var canTakePhoto: Bool { !surveyOnly && phase == .scanning && !paused && captureReady && !highResInFlight && photosInFlight == 0 }
   @Published private(set) var lastWarning: String?
   /// good news (relocalized, map saved) shown briefly
   @Published private(set) var notice: String?
@@ -690,6 +691,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     engine.setRoom(nil)
     scanView.showRoom(nil)
     phase = .scanning
+    if surveyOnly { recordMagneticMeasurements = true }
     magneticRecorder.start(room: roomIndex, enabled: recordMagneticMeasurements)
     magneticStatus = magneticRecorder.status
     applyGhostOpacity()
@@ -821,6 +823,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     record.photoCoverage = record.photographedPercent
     record.detailSeconds = roomStartedAt.map { Date().timeIntervalSince($0) }
     record.detailPhotos = roomPhotoCount
+    record.captureMode = surveyOnly ? "lidar-magnetic" : "full"
     rooms.append(record)
     pendingRoomIDs[index] = selectedRoomID
     do {
@@ -1344,9 +1347,11 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     }
     guard !paused, captureReady else { return }
     magneticRecorder.consider(frame)
+    liveGuide.updateLiDAR(frame, room: roomIndex)
     if magneticStatus != magneticRecorder.status { magneticStatus = magneticRecorder.status }
     let budget = captureBudget
-    depthRecorder.consider(frame, room: roomIndex, camera: cameraControl.state(for: frame), interval: budget.depthInterval)
+    depthRecorder.consider(frame, room: roomIndex, camera: cameraControl.state(for: frame), interval: budget.depthInterval, includeColor: !surveyOnly)
+    guard !surveyOnly else { return }
     if frame.timestamp - lastEvaluate > budget.evaluationInterval {
       lastEvaluate = frame.timestamp
       engine.evaluate(view: Self.enginePhoto(frame: frame, sharpness: 1, depth: nil, room: roomIndex))
@@ -1387,7 +1392,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   /// the engine estimates how much red the current view would turn green; before that,
   /// any new viewpoint counts. Either way, hold the sharpest frame of that view.
   private func autoPhoto(_ frame: ARFrame, blur: Float) {
-    guard autoPhotos, photosInFlight == 0, !highResInFlight, case .normal = frame.camera.trackingState else { return }
+    guard !surveyOnly, autoPhotos, photosInFlight == 0, !highResInFlight, case .normal = frame.camera.trackingState else { return }
     let view = PhotoView(transform: frame.camera.transform)
     if resolveCandidate(frame: frame, view: view) { return }
     guard frame.timestamp - lastPhotoTime > captureBudget.photoInterval, blur <= Self.acceptableBlur else { return }

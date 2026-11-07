@@ -8,7 +8,7 @@
     },
     {
       "title": "What the app saves",
-      "body": "When you scan, the app uses the camera and LiDAR to save room geometry, reference photos, depth frames, camera poses, and tracking maps on your device. If you enable magnetic recording, it also saves magnetic field measurements, sensor calibration quality, device attitude and timestamps paired with camera positions. It also saves room names, scan times, device and system information, and technical diagnostics such as tracking errors and memory or thermal conditions. Photos and room geometry can reveal private details of your surroundings."
+      "body": "Full room scanning saves geometry, reference photos, depth frames, camera poses and tracking maps on your device, with optional magnetic measurements. Saved LiDAR + magnetic survey mode omits new reference photos and depth RGB images. Live survey — don’t save creates no house, room or capture files: LiDAR tracking and the latest magnetic sample stay in memory and are cleared on stopping or leaving the foreground. All modes need the camera for tracking. Saved scans can include room names, scan times, device/system information and technical diagnostics. Photos and geometry can reveal private details."
     },
     {
       "title": "Permissions",
@@ -16,7 +16,7 @@
     },
     {
       "title": "Optional live guide",
-      "body": "Only when you connect to a ready PC, the app sends magnetic measurements, sensor quality, room name, camera positions, scan status and submitted questions to that PC over a paired but unencrypted LAN connection. Use a trusted private network. No photos, mesh or raw microphone audio are sent. When you submit a question, the PC guide can send text, conversation context and a compact measurement summary to OpenAI through Codex using your PC login and account limits. This is a separate guide conversation. Replies are read aloud by iOS if enabled. The PC keeps a readable snapshot and recent measurements; manage those local files separately. The link stops when you stop the guide, finish/discard/leave the scan or the app becomes inactive, and does not reconnect automatically."
+      "body": "Only when you connect to a ready PC, magnetic measurements, sensor quality, camera positions, scan status, LiDAR range summaries and submitted questions go to that PC over a paired but unencrypted LAN connection. Use a trusted private network. No photos, full mesh or raw microphone audio are sent. The PC can send questions, conversation context and measurement summaries to OpenAI through Codex using your PC login and account limits. This is a separate guide conversation. Optional speech sending submits recognized text after a short pause; disable it to review first. Speech recognition stays on-device; iOS voices read replies locally. The PC keeps its own readable snapshot, including for unsaved phone surveys. Connection, voice and speech preferences are remembered; the phone pairing code is stored in Keychain and the PC keeps a local pairing-code file. The link stops when stopped, when leaving/finishing/discarding the scan or when the app becomes inactive, and does not reconnect automatically."
     },
     {
       "title": "Sharing and Files",

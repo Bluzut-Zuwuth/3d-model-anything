@@ -335,7 +335,7 @@ final class DepthRecorder: @unchecked Sendable {
   }
 
   /// Call every frame; keeps one when the camera has moved or turned enough (≤ 5/s)
-  func consider(_ frame: ARFrame, room: Int, camera: CameraState?, interval: TimeInterval = 0.2) {
+  func consider(_ frame: ARFrame, room: Int, camera: CameraState?, interval: TimeInterval = 0.2, includeColor: Bool = true) {
     guard let depth = frame.sceneDepth, inFlight < 3 else { return }
     guard case .normal = frame.camera.trackingState else { return }
     let pose = frame.camera.transform
@@ -355,11 +355,14 @@ final class DepthRecorder: @unchecked Sendable {
     let rgbScale = 640 / Float(frame.camera.imageResolution.width)
     var kc = frame.camera.intrinsics
     kc.columns.0.x *= rgbScale; kc.columns.1.y *= rgbScale; kc.columns.2.x *= rgbScale; kc.columns.2.y *= rgbScale
-    let small = CIImage(cvPixelBuffer: frame.capturedImage).transformed(by: CGAffineTransform(scaleX: CGFloat(rgbScale), y: CGFloat(rgbScale)))
-    let cg = ci.createCGImage(small, from: CGRect(x: 0, y: 0, width: 640, height: CGFloat((Float(frame.camera.imageResolution.height) * rgbScale).rounded())))
+    let cg: CGImage?
+    if includeColor {
+      let small = CIImage(cvPixelBuffer: frame.capturedImage).transformed(by: CGAffineTransform(scaleX: CGFloat(rgbScale), y: CGFloat(rgbScale)))
+      cg = ci.createCGImage(small, from: CGRect(x: 0, y: 0, width: 640, height: CGFloat((Float(frame.camera.imageResolution.height) * rgbScale).rounded())))
+    } else { cg = nil }
     let record = Record(
       file: "depth/\(name).f16z", confidence: "depth/\(name).conf", rgb: cg == nil ? nil : "depth/\(name).jpg",
-      rgbIntrinsics: kc.columnMajor, camera: camera, room: room, timestamp: frame.timestamp,
+      rgbIntrinsics: includeColor ? kc.columnMajor : nil, camera: camera, room: room, timestamp: frame.timestamp,
       width: w, height: h, transform: pose.columnMajor, intrinsics: k.columnMajor)
     let depthData = Self.float16(depth.depthMap)
     let confData = depth.confidenceMap.map(Self.bytes)

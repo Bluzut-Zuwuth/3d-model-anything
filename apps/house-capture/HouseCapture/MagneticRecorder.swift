@@ -36,6 +36,9 @@ final class MagneticRecorder {
   private var lastTimestamp: TimeInterval = -.infinity
   private(set) var status = "Magnetic recording off"
   private var enabled = false
+  /// Live-only surveys retain just the newest sample and never call save(in:).
+  var retainsSamples = true
+  private var sampleCount = 0
   static let sampleLimit = 9_000 // bounded: about 30 minutes at 5 Hz
 
   func start(room: Int, enabled: Bool) {
@@ -43,6 +46,7 @@ final class MagneticRecorder {
     self.room = room
     self.enabled = enabled
     samples.removeAll(keepingCapacity: true)
+    sampleCount = 0
     lastTimestamp = -.infinity
     guard enabled else { status = "Magnetic recording off"; return }
     guard motion.isDeviceMotionAvailable, motion.isMagnetometerAvailable,
@@ -92,6 +96,7 @@ final class MagneticRecorder {
     let magnitude = sqrt(b.reduce(0) { $0 + $1 * $1 })
     let t = frame.camera.transform
     let q = data.attitude.quaternion
+    if !retainsSamples { samples.removeAll(keepingCapacity: true) }
     samples.append(Sample(
       room: room, timestamp: frame.timestamp, motionTimestamp: data.timestamp,
       poseDeltaSeconds: delta,
@@ -102,8 +107,9 @@ final class MagneticRecorder {
       deviceAttitudeQuaternion: [q.x, q.y, q.z, q.w]
     ))
     lastTimestamp = frame.timestamp
+    sampleCount += 1
     let accuracy = field.accuracy == .uncalibrated ? "uncalibrated" : "accuracy \(field.accuracy.rawValue)"
-    status = String(format: "%.1f µT · %@ · %d samples", magnitude, accuracy, samples.count)
+    status = String(format: "%.1f µT · %@ · %d samples", magnitude, accuracy, sampleCount)
   }
 
   func save(in bundle: ScanBundle) throws {

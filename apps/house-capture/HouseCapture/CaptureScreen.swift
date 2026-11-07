@@ -21,11 +21,7 @@ struct CaptureScreen: View {
 
       VStack {
         topBar
-        Button { showingGuide = true } label: {
-          Label("Live scan guide · speak or type", systemImage: "waveform")
-            .font(.footnote.weight(.semibold)).padding(8)
-            .background(.regularMaterial, in: Capsule())
-        }
+        ScanGuideBar(guide: controller.liveGuide) { showingGuide = true }
         if let notice = controller.notice {
           Label(notice, systemImage: "checkmark.circle.fill")
             .font(.footnote.weight(.semibold))
@@ -91,7 +87,7 @@ struct CaptureScreen: View {
     }
     .onDisappear { controller.liveGuide.disconnect() }
     .onChange(of: controller.phase) { old, next in
-      if old == .finishingRoom, next == .betweenRooms, controller.reviewSource != nil, !controller.captureBudget.constrained { reviewing = true }
+      if old == .finishingRoom, next == .betweenRooms, !controller.surveyOnly, controller.reviewSource != nil, !controller.captureBudget.constrained { reviewing = true }
     }
     .onAppear { controller.begin() }
     .onChange(of: scenePhase) { _, phase in
@@ -116,7 +112,7 @@ struct CaptureScreen: View {
       Spacer()
       VStack(alignment: .trailing, spacing: 6) {
         HStack(spacing: 10) {
-          if scanning {
+          if scanning && !controller.surveyOnly {
             VStack(spacing: 3) {
               CoverageRing(percent: controller.stats.percent).frame(width: 44, height: 44)
               Text("Photo detail").font(.system(size: 9, weight: .semibold))
@@ -131,7 +127,7 @@ struct CaptureScreen: View {
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
             }
-            Text("\(controller.rooms.count) room\(controller.rooms.count == 1 ? "" : "s") · \(controller.photoCount) photos")
+            Text(controller.surveyOnly ? "LiDAR + magnetic · no photos" : "\(controller.rooms.count) room\(controller.rooms.count == 1 ? "" : "s") · \(controller.photoCount) photos")
               .font(.caption.monospacedDigit())
             if controller.recordMagneticMeasurements {
               Text(controller.magneticStatus).font(.caption.monospacedDigit())
@@ -220,6 +216,8 @@ struct CaptureScreen: View {
         if controller.alignment.method == "relocalized" {
           Text("You're lined up with \(controller.zoneName). The faint green is what you scanned before\(controller.priorPhotoCount > 0 ? "; surfaces its \(controller.priorPhotoCount) photos already cover start out green" : ""). Scan a new room, or rescan one to replace it.")
             .font(.subheadline)
+        } else if controller.surveyOnly {
+          Text("Measure the room geometry and magnetic field at different tracker heights. This mode saves depth, mesh and magnetic readings without reference photos. The camera runs for tracking. Use Live survey on the home screen if you don’t want to save anything on the phone.").font(.subheadline)
         } else {
           Text("Scan each room once: as you move, a triangle mesh appears. **Green** means good photo coverage, including aligned earlier scans. **Red** needs more photos. Areas without triangles still need scanning. The white outlines are the walls, doors and windows being measured. **Photo detail** measures photography on surfaces already seen by LiDAR; it is not the percentage of the room scanned. Save and review for missing areas.")
             .font(.subheadline)
@@ -229,11 +227,11 @@ struct CaptureScreen: View {
           .frame(height: 150)
           .frame(maxWidth: .infinity)
         if let last = controller.rooms.last {
-          Text("\(last.name): \(last.photographedPercent.map { "\($0)% photo detail" } ?? "not measured") · \(last.detailPhotos ?? 0) photos\(last.mesh == nil ? " · no mesh" : "")")
+          Text(last.captureMode == "lidar-magnetic" ? "\(last.name): LiDAR + magnetic survey · no new photos" : "\(last.name): \(last.photographedPercent.map { "\($0)% photo detail" } ?? "not measured") · \(last.detailPhotos ?? 0) photos\(last.mesh == nil ? " · no mesh" : "")")
             .font(.footnote)
         }
         Button("Review saved room in 3D") { reviewing = true }.buttonStyle(.borderedProminent)
-        Text("Inspect the textured scan before leaving. Use coverage colours in the preview to check gaps.").font(.caption)
+        Text(controller.surveyOnly ? "Review the untextured geometry or finish the session to export your survey." : "Inspect the textured scan before leaving. Use coverage colours in the preview to check gaps.").font(.caption)
         roomList
         Text("Walk into the next room, then start it. Stay in this session so the rooms line up.")
           .font(.footnote)
@@ -275,16 +273,22 @@ struct CaptureScreen: View {
           .font(.caption2)
           .foregroundStyle(.secondary)
       }
+      Toggle("LiDAR + magnetic only · save survey", isOn: $controller.surveyOnly)
+        .font(.subheadline)
+      if !controller.surveyOnly {
       Toggle("High-resolution automatic photos", isOn: $controller.highResolutionPhotos)
         .font(.subheadline)
       Toggle("Record magnetic measurements", isOn: $controller.recordMagneticMeasurements)
         .font(.subheadline)
-      if controller.recordMagneticMeasurements {
+      }
+      if controller.recordMagneticMeasurements || controller.surveyOnly {
         Text("Experimental: records magnetic strength and device-axis vectors at your camera position. Remove magnetic accessories. Sample at tracker heights; confirm hotspots with Rebocap. Measurements are saved when you finish the room.")
           .font(.caption).foregroundStyle(.secondary)
       }
+      if !controller.surveyOnly {
       Text("Regular photos use camera frames for a lighter scan. High-resolution photos add processing and are limited to one request every 3 seconds while the phone is cool. The shutter always saves a regular photo.")
         .font(.caption).foregroundStyle(.secondary)
+      }
       Button {
         controller.startRoom()
       } label: {
@@ -348,20 +352,20 @@ struct CaptureScreen: View {
   private var scanControls: some View {
     VStack(spacing: 10) {
       if controller.captureReady {
-        tip(controller.quality.ready ? controller.quality.message : (controller.instruction ?? controller.quality.message))
-        if controller.coveragePlateau && !controller.quality.ready {
+        tip(controller.surveyOnly ? "Move slowly at each tracker height. Save when your passes are complete." : (controller.quality.ready ? controller.quality.message : (controller.instruction ?? controller.quality.message)))
+        if !controller.surveyOnly && controller.coveragePlateau && !controller.quality.ready {
           tip("Photo detail isn't improving much. You can save and review what you have; you don't need to keep circling.")
         }
         if controller.captureBudget.constrained { Text("Reducing background capture to keep scanning responsive.").font(.caption).foregroundStyle(.white) }
       }
       HStack(spacing: 14) {
-        Legend()
+        if !controller.surveyOnly { Legend() }
         Button(action: controller.pause) {
           Image(systemName: "pause.fill")
         }
         .buttonStyle(.bordered)
-        shutter
-        Button(controller.quality.ready ? "Finish room ✓" : "Save room", action: controller.finishRoom)
+        if !controller.surveyOnly { shutter }
+        Button(controller.surveyOnly ? "Save survey" : (controller.quality.ready ? "Finish room ✓" : "Save room"), action: controller.finishRoom)
           .buttonStyle(.borderedProminent)
           .tint(controller.quality.ready ? .green : .accentColor)
           .controlSize(.large)

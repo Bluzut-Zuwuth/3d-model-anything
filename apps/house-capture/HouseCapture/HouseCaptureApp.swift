@@ -35,6 +35,7 @@ struct HomeView: View {
   @State private var naming = false
   @State private var importing = false
   @State private var working = false
+  @State private var liveSurvey = false
   @State private var newName = ""
   @State private var deleting: HouseProject?
   /// bumped when a capture closes so the house screen reloads
@@ -92,6 +93,7 @@ struct HomeView: View {
             .accessibilityLabel("Import room folder").disabled(working)
         }
         ToolbarItem(placement: .topBarTrailing) {
+          NavigationLink { GuideSettingsScreen() } label: { Image(systemName: "gearshape").frame(width: 44, height: 44) }.accessibilityLabel("Settings")
           NavigationLink { AppHelpScreen() } label: { Image(systemName: "questionmark.circle").frame(width: 44, height: 44) }.accessibilityLabel("Help and privacy")
         }
       }
@@ -104,12 +106,17 @@ struct HomeView: View {
       .background(Fieldwork.paper).foregroundStyle(Fieldwork.ink)
       .navigationTitle("").navigationBarTitleDisplayMode(.inline)
       .safeAreaInset(edge: .bottom) {
+        VStack(spacing: 8) {
+        Button { liveSurvey = true } label: { Label("Live survey · don’t save", systemImage: "waveform.path") }
+          .buttonStyle(FieldworkButtonStyle()).disabled(!CaptureController.isSupported)
+          .padding(.horizontal, 24)
         Button {
           newName = houses.isEmpty ? "Our house" : ""
           naming = true
         } label: { Label("New house", systemImage: "plus") }
           .buttonStyle(FieldworkButtonStyle()).disabled(!CaptureController.isSupported)
           .padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 10).background(Fieldwork.paper)
+        }.padding(.top, 10).background(Fieldwork.paper)
       }
       .navigationDestination(for: String.self) { id in
         HouseScreen(houseID: id, generation: generation, onCapture: startCapture, onGone: { path.removeAll() })
@@ -146,11 +153,15 @@ struct HomeView: View {
       .fullScreenCover(item: $capture, onDismiss: captureClosed) { controller in
         CaptureScreen(controller: controller) { capture = nil }
       }
+      .fullScreenCover(isPresented: $liveSurvey) { LiveSurveyScreen() }
     }
     .tint(Fieldwork.orange)
     .preferredColorScheme(.light)
     .toolbarBackground(Fieldwork.paper, for: .navigationBar)
     .toolbarBackground(.visible, for: .navigationBar)
+    .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+      LiveGuide.shared.disconnect()
+    }
   }
 
   private func reload() {

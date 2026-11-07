@@ -32,11 +32,16 @@ test('pairing, readable telemetry, Unicode questions, rejected second phone and 
   duplicate.write(JSON.stringify({ type: 'hello', version: 1, token }) + '\n'); await dupClosed;
   phone.write(JSON.stringify({ type: 'status', phase: 'scanning', paused: false, tracking: 'normal', room: 0, roomName: 'Test room' }) + '\n');
   phone.write(JSON.stringify({ type: 'sample', sample }) + '\n');
+  phone.write(JSON.stringify({ type: 'lidar', timestamp: 100, room: 0, position: [1,2,3], width: 256, height: 192,
+    sampleStride: 8, validSampledPoints: 300, meshAnchors: 8, nearestMeters: .5, farthestMeters: 3 }) + '\n');
   const get = async () => (await fetch(`http://127.0.0.1:${base + 1}/snapshot`)).json();
   const data = await waitFor(async () => { const d = await get(); return d.measurements.sampleCount === 1 && d; });
   assert.equal(data.measurements.latest.magnitudeMicrotesla, 50);
   assert.equal(data.status.roomName, 'Test room');
   assert.equal(data.measurements.fresh, true);
+  const depth = await waitFor(async () => (await get()).lidar);
+  assert.equal(depth.meshAnchors, 8);
+  assert.equal(depth.fresh, true);
   const question = Buffer.from(JSON.stringify({ type: 'question', text: 'Höhe?' }) + '\n');
   const index = question.indexOf(Buffer.from('ö')) + 1;
   phone.write(question.subarray(0, index)); await delay(20); phone.write(question.subarray(index));

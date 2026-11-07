@@ -385,6 +385,7 @@ struct Diagnostics: Codable {
 }
 
 struct RoomRecord: Codable, Identifiable {
+  var captureMode: String? // nil in earlier scans; full or lidar-magnetic
   var index: Int
   var name: String
   var file: String
