@@ -14,8 +14,10 @@ final class LiveGuide: ObservableObject {
   @Published private(set) var reply = ""
   @Published var question = ""
   @Published private(set) var listening = false
+  @Published private(set) var preparingSpeech = false
   @Published private(set) var busy = false
   @Published var speakReplies = true
+  @Published var speechLanguage = "en-US"
   private var connection: NWConnection?
   private var buffer = Data()
   private var pending = 0
@@ -137,7 +139,9 @@ final class LiveGuide: ObservableObject {
             if self.speakReplies && !self.listening {
               try? AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
               try? AVAudioSession.sharedInstance().setActive(true)
-              self.speaker.speak(AVSpeechUtterance(string: self.reply))
+              let utterance = AVSpeechUtterance(string: self.reply)
+              utterance.voice = AVSpeechSynthesisVoice(language: self.speechLanguage)
+              self.speaker.speak(utterance)
             }
           }
           if type == "error" { self.busy = false; self.status = String((obj["text"] as? String ?? "Guide error").prefix(500)) }
@@ -148,21 +152,24 @@ final class LiveGuide: ObservableObject {
   }
 
   func startListening() async {
-    guard connected, !busy, !listening else { return }
+    guard connected, !busy, !listening, !preparingSpeech else { return }
+    stopListening()
+    preparingSpeech = true
     let id = generation
+    let speechID = speechGeneration
+    defer { if speechGeneration == speechID { preparingSpeech = false } }
     let permission = await withCheckedContinuation { continuation in
       SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
     }
     let mic = await withCheckedContinuation { continuation in
       AVAudioSession.sharedInstance().requestRecordPermission { continuation.resume(returning: $0) }
     }
-    guard generation == id, connected else { return }
+    guard generation == id, speechGeneration == speechID, connected else { return }
     guard permission == .authorized, mic else { status = "Enable microphone and speech access in Settings, or type"; return }
-    guard let recognizer = SFSpeechRecognizer(locale: Locale.current), recognizer.supportsOnDeviceRecognition, recognizer.isAvailable else {
+    guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: speechLanguage)), recognizer.supportsOnDeviceRecognition, recognizer.isAvailable else {
       status = "On-device speech unavailable for this language; type your question"; return
     }
     speaker.stopSpeaking(at: .immediate)
-    stopListening()
     do {
       try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker])
       try AVAudioSession.sharedInstance().setActive(true)
@@ -174,7 +181,6 @@ final class LiveGuide: ObservableObject {
       guard format.sampleRate > 0, format.channelCount > 0 else { status = "Microphone unavailable; type instead"; return }
       input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in r.append(buffer) }
       tapInstalled = true
-      let speechID = speechGeneration
       recognition = recognizer.recognitionTask(with: r) { [weak self] result, error in
         Task { @MainActor in
           guard let self, self.generation == id, self.speechGeneration == speechID, self.listening else { return }
@@ -194,6 +200,7 @@ final class LiveGuide: ObservableObject {
   func stopListening() {
     speechGeneration = UUID()
     listening = false
+    preparingSpeech = false
     micTimer?.invalidate(); micTimer = nil
     engine.stop()
     if tapInstalled { engine.inputNode.removeTap(onBus: 0); tapInstalled = false }
@@ -217,10 +224,14 @@ struct LiveGuidePanel: View {
       }
       if guide.connected {
         Section("Speak or type") {
+          Picker("Speech language", selection: $guide.speechLanguage) {
+            Text("English").tag("en-US")
+            Text("Deutsch").tag("de-DE")
+          }.disabled(guide.listening || guide.preparingSpeech)
           Toggle("Read replies aloud", isOn: $guide.speakReplies)
           Button(guide.listening ? "Done speaking" : "Tap to speak") {
             if guide.listening { guide.stopListening() } else { Task { await guide.startListening() } }
-          }.disabled(guide.busy)
+          }.disabled(guide.busy || guide.preparingSpeech)
           TextField("Review or type your question", text: $guide.question, axis: .vertical).lineLimit(2...5)
           Button("Send question", action: guide.ask).disabled(guide.busy || guide.listening || guide.question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           if !guide.reply.isEmpty { Text(guide.reply).textSelection(.enabled) }

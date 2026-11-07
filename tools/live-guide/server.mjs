@@ -43,7 +43,7 @@ function ask(socket, text) {
   if (!guideEnabled) { send(socket, { type: 'error', text: 'PC is in telemetry-only mode. Restart it with --guide to enable replies.' }); return; }
   if (child) { send(socket, { type: 'error', text: 'Please wait for the current reply.' }); return; }
   lastQuestion = text;
-  const input = `${prompt}\nEarlier context: ${context}\nRecent conversation: ${JSON.stringify(history)}\nLIVE DATA: ${JSON.stringify(snapshot())}\nUser question: ${JSON.stringify(text)}`;
+  const input = `${prompt}\nEarlier context: ${context}\nRecent conversation: ${JSON.stringify(history)}\nLIVE DATA: ${JSON.stringify(snapshot())}\nUser question: ${JSON.stringify(text)}\nRespond in English unless the user's question is in another language or explicitly requests another language. No tools.`;
   let output = '', errors = '', timedOut = false;
   // Arg array + stdin: no shell, no interpolation of questions into commands.
   // Ignore user config so personal MCP servers/hooks are not exposed to LAN input.
